@@ -19,10 +19,14 @@ type gameinfo struct {
 	Summary string `json:"summary"`
 }
 
+type gamelist []gameinfo
+
 type steamuri struct {
 	Id  int    `json:"id"`
 	Url string `json:"url"`
 }
+
+type steamlist []steamuri
 
 func getCurrentGame(channel string) string {
 	req := httputil.HTTP{
@@ -39,13 +43,14 @@ func getCurrentGame(channel string) string {
 
 func getGameInfo(game string) (gameinfo, error) {
 	req := httputil.HTTP{
-		TargetURL: fmt.Sprintf("https://api-v3.igdb.com/games?search=%s&fields=id,name,summary", game),
+		TargetURL: "https://api-v3.igdb.com/games",
 		Headers: map[string]string{
 			"user-key": igdbUserKey,
 		},
+		Body: fmt.Sprintf("fields id,name,summary; search \"%s\"; where name != \"Fall Guy\"; limit 3;", game),
 	}
 
-	var games []gameinfo
+	var games gamelist
 
 	req.JSON(&games)
 
@@ -65,7 +70,7 @@ func getSteamUri(gameid int) (steamuri, error) {
 		Body: fmt.Sprintf("fields url; where category=13 & game=%d;", gameid),
 	}
 
-	var uris []steamuri
+	var uris steamlist
 
 	req.JSON(&uris)
 
