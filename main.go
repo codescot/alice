@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -81,6 +82,20 @@ func getSteamUri(gameid int) (steamuri, error) {
 	return uris[0], nil
 }
 
+func okString(response string) (events.APIGatewayProxyResponse, error) {
+	return events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Body:       response,
+	}, nil
+}
+
+func truncateString(s string, m int) string {
+	var b bytes.Buffer
+	b.WriteString(s[0:m])
+	b.WriteString("...")
+	return b.String()
+}
+
 func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	igdbUserKey = os.Getenv("IGDB_KEY")
 
@@ -89,36 +104,27 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 
 	gameInfo, err := getGameInfo(currentGame)
 	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 200,
-			Body:       err.Error(),
-		}, nil
+		return okString(err.Error())
 	}
 
 	steamUri, err := getSteamUri(gameInfo.Id)
 	if err != nil {
 		summary := gameInfo.Summary
 		if len(summary) > 500 {
-			summary = summary[0:497] + "..."
+			summary = truncateString(summary, 497)
 		}
 
-		return events.APIGatewayProxyResponse{
-			StatusCode: 200,
-			Body:       summary,
-		}, nil
+		return okString(summary)
 	}
 
 	summary := gameInfo.Summary
 	steam := steamUri.Url
 	if len(summary) > 500 {
-		maxLen := 496 - len(steam)
-		summary = summary[0:maxLen] + "..."
+		m := 496 - len(steam)
+		summary = truncateString(summary, m)
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Body:       fmt.Sprintf("%s %s", summary, steam),
-	}, nil
+	return okString(fmt.Sprintf("%s %s", summary, steam))
 }
 
 func main() {
