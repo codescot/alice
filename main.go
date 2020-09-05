@@ -15,7 +15,7 @@ import (
 var igdbUserKey string
 
 type gameinfo struct {
-	Id      int    `json:"id"`
+	ID      int    `json:"id"`
 	Name    string `json:"name"`
 	Summary string `json:"summary"`
 }
@@ -23,8 +23,8 @@ type gameinfo struct {
 type gamelist []gameinfo
 
 type steamuri struct {
-	Id  int    `json:"id"`
-	Url string `json:"url"`
+	ID  int    `json:"id"`
+	URL string `json:"url"`
 }
 
 type steamlist []steamuri
@@ -32,14 +32,20 @@ type steamlist []steamuri
 func getCurrentGame(channel string) string {
 	req := httputil.HTTP{
 		TargetURL: fmt.Sprintf("https://decapi.me/twitch/game/%s", channel),
-		Headers: map[string]string{
-			"user-key": igdbUserKey,
-		},
 	}
 
 	game, _ := req.String()
 
 	return game
+}
+
+func ignoreGame(game string) bool {
+	switch game {
+	case "Games + Demos":
+		return true
+	default:
+		return false
+	}
 }
 
 func getGameInfo(game string) (gameinfo, error) {
@@ -56,13 +62,13 @@ func getGameInfo(game string) (gameinfo, error) {
 	req.JSON(&games)
 
 	if len(games) == 0 {
-		return gameinfo{}, errors.New(fmt.Sprintf("no game info for %s", game))
+		return gameinfo{}, fmt.Errorf("no game info for %s", game)
 	}
 
 	return games[0], nil
 }
 
-func getSteamUri(gameid int) (steamuri, error) {
+func getSteamURI(gameid int) (steamuri, error) {
 	req := httputil.HTTP{
 		TargetURL: "https://api-v3.igdb.com/websites",
 		Headers: map[string]string{
@@ -101,13 +107,16 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 
 	channel := request.QueryStringParameters["channel"]
 	currentGame := getCurrentGame(channel)
+	if ignoreGame(currentGame) {
+		return okString(currentGame)
+	}
 
 	gameInfo, err := getGameInfo(currentGame)
 	if err != nil {
 		return okString(err.Error())
 	}
 
-	steamUri, err := getSteamUri(gameInfo.Id)
+	steamURI, err := getSteamURI(gameInfo.ID)
 	if err != nil {
 		summary := gameInfo.Summary
 		if len(summary) > 500 {
@@ -118,7 +127,7 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}
 
 	summary := gameInfo.Summary
-	steam := steamUri.Url
+	steam := steamURI.URL
 	if len(summary) > 500 {
 		m := 496 - len(steam)
 		summary = truncateString(summary, m)
