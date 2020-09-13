@@ -8,3 +8,5 @@ s3_prefix = "gameinfo"
 region = "eu-west-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
+parameter_overrides = "StageName=\"dev\""
+
