@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  CertificateArn:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: 'CertificateArn'
+  CertificateName:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: 'CertificateName'
+  CustomDomain:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: 'CustomDomain'
+  MappingKey:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: 'MappingKey'
+  MongoDbConnection:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: 'MongoDbConnection'
+  StageName:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: 'StageName'
+  TwitchClientId:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: 'TwitchClientId'
+  TwitchClientSecret:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: 'TwitchClientSecret'
+Description: >
+  alice api
+
+Globals:
+  Function:
+    MemorySize: 512
+    Timeout: 30
+
+Resources:
+  AliceDomain:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: !Ref CustomDomain
+      DomainNameConfigurations:
+        - EndpointType: REGIONAL
+          CertificateArn: !Ref CertificateArn
+          CertificateName: !Ref CertificateName
+  AliceAPI:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref StageName
+  AliceAPIMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: !Ref CustomDomain
+      ApiId: !Ref AliceAPI
+      Stage: !Ref AliceAPI.Stage
+      ApiMappingKey: !Ref MappingKey
+  GameInfoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: gameinfo/
+      Handler: main
+      Runtime: go1.x
+      Events:
+        ExplicitApi:
+          Type: HttpApi
+          Properties:
+            Path: /gameinfo
+            Method: GET
+            ApiId: !Ref AliceAPI
+      Environment:
+        Variables:
+          TWITCH_CLIENT_ID: !Ref TwitchClientId
+          TWITCH_CLIENT_SECRET: !Ref TwitchClientSecret
+  DangYouFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dangyou/
+      Handler: main
+      Runtime: go1.x
+      Events:
+        ExplicitApi:
+          Type: HttpApi
+          Properties:
+            Path: /dangyou
+            Method: GET
+            ApiId: !Ref AliceAPI
+  QuotesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: quotes/
+      Handler: Quotes::Quotes.Function::FunctionHandler
+      Runtime: dotnetcore3.1
+      Environment:
+        Variables:
+          TWITCH_CLIENT_ID: !Ref TwitchClientId
+          TWITCH_CLIENT_SECRET: !Ref TwitchClientSecret
+          MONGODB_CONNECTION: !Ref MongoDbConnection
+      Events:
+        ExplicitApi:
+          Type: HttpApi
+          Properties:
+            Path: /quote
+            Method: GET
+            ApiId: !Ref AliceAPI
+  HugFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hug/
+      Handler: app.lambdaHandler
+      Runtime: nodejs12.x
+      Events:
+        ExplicitApi:
+          Type: HttpApi
+          Properties:
+            Path: /hug
+            Method: GET
+            ApiId: !Ref AliceAPI
+
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  AliceAPI:
+    Description: "API Gateway endpoint URL for ${StageName} environment for Function"
+    Value: !Sub "https://${AliceAPI}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+  GameInfoFunction:
+    Description: "GameInfoFunction ARN"
+    Value: !GetAtt GameInfoFunction.Arn
+  DangYouFunction:
+    Description: "DangYouFunction ARN"
+    Value: !GetAtt DangYouFunction.Arn
+  QuotesFunction:
+    Description: "QuotesFunction ARN"
+    Value: !GetAtt QuotesFunction.Arn
+  GameInfoIamRole:
+    Description: "Implicit IAM Role created for GameInfoFunction"
+    Value: !GetAtt GameInfoFunctionRole.Arn
+  DangYouIamRole:
+    Description: "Implicit IAM Role created for DangYouFunction"
+    Value: !GetAtt DangYouFunctionRole.Arn
+  QuotesIamRole:
+    Description: "Implicit IAM Role created for QuotesFunction"
+    Value: !GetAtt QuotesFunctionRole.Arn

@@ -1,0 +1,5 @@
+.aws-sam
+env.json
+**/.vs
+**/bin
+**/obj
